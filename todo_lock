@@ -1,0 +1,31 @@
+#!/bin/bash
+
+LOCK_FILE="$1"
+TODO_LOCK_FILE="$2"
+COMMAND="$3"
+
+function run {
+        # if obtained, run the command, but install exit handler in case we crash
+        trap "rm -f $LOCK_FILE; exit" INT TERM EXIT
+        $COMMAND
+
+        # check if there is pending work
+        if [ -e "$TODO_LOCK_FILE" ]; then
+            rm -f "$TODO_LOCK_FILE"
+            run
+        fi
+}
+
+# attempt to obtain lock
+lockfile -r 0 "$LOCK_FILE" > /dev/null 2>&1
+
+if [ "$?" == "0" ]; then
+    run
+else
+    # mark a todo task
+    echo "queuing up todo task"
+    lockfile -r 0 "$TODO_LOCK_FILE" > /dev/null 2>&1
+fi
+
+
+

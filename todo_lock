@@ -1,8 +1,20 @@
 #!/bin/bash
 
+MINIMUM_ARGS=3
+
 LOCK_FILE="$1"
 TODO_LOCK_FILE="$2"
 COMMAND="$3"
+MAX_AGE="$4"
+
+if [ -z "$MAX_AGE" ]; then
+    MAX_AGE=10 # default 10 minutes
+fi
+
+function help {
+    echo "todo_lock LOCK_FILE TODO_LOCK_FILE COMMAND [MAX_COMMAND_TIME]"
+}
+
 
 function run {
         # if obtained, run the command, but install exit handler in case we crash
@@ -16,16 +28,24 @@ function run {
         fi
 }
 
-# attempt to obtain lock
-lockfile -r 0 "$LOCK_FILE" > /dev/null 2>&1
-
-if [ "$?" == "0" ]; then
-    run
-else
-    # mark a todo task
-    echo "queuing up todo task"
-    lockfile -r 0 "$TODO_LOCK_FILE" > /dev/null 2>&1
+if [ $# -lt $MINIMUM_ARGS ]; then
+    help
+    exit 1
 fi
 
+if test `find "$LOCK_FILE" -mmin +$MAX_AGE`
+then
+        echo "assuming that $COMMAND is done"
+        run  
+else
+    # attempt to obtain lock
+    lockfile -r 0  "$LOCK_FILE" > /dev/null 2>&1
 
-
+    if [ "$?" == "0" ]; then
+        run
+    else
+        # mark a todo task
+        echo "queuing up todo task"
+        lockfile -r 0 "$TODO_LOCK_FILE" > /dev/null 2>&1
+    fi
+fi
